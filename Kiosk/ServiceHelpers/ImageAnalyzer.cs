@@ -46,7 +46,8 @@ namespace ServiceHelpers
     public class ImageAnalyzer
     {
         private static FaceAttributeType[] DefaultFaceAttributeTypes = new FaceAttributeType[] { FaceAttributeType.Age, FaceAttributeType.Gender, FaceAttributeType.HeadPose };
-
+        private static VisualFeature[] DefaultVisualFeatures = new VisualFeature[] { VisualFeature.Color, VisualFeature.Adult, VisualFeature.Description , VisualFeature.Tags };
+        
         public event EventHandler FaceDetectionCompleted;
         public event EventHandler FaceRecognitionCompleted;
         public event EventHandler EmotionRecognitionCompleted;
@@ -189,6 +190,30 @@ namespace ServiceHelpers
                 else if (this.GetImageStreamCallback != null)
                 {
                     this.AnalysisResult = await VisionServiceHelper.DescribeAsync(this.GetImageStreamCallback);
+                }
+            }
+            catch (Exception e)
+            {
+                this.AnalysisResult = new Microsoft.ProjectOxford.Vision.Contract.AnalysisResult();
+
+                if (this.ShowDialogOnFaceApiErrors)
+                {
+                    await ErrorTrackingHelper.GenericApiCallExceptionHandler(e, "Vision API failed.");
+                }
+            }
+        }
+
+        public async Task AnalyseAsync()
+        {
+            try
+            {
+                if (this.ImageUrl != null)
+                {
+                    this.AnalysisResult = await VisionServiceHelper.AnalyzeImageAsync(this.ImageUrl, DefaultVisualFeatures);
+                }
+                else if (this.GetImageStreamCallback != null)
+                {
+                    this.AnalysisResult = await VisionServiceHelper.AnalyzeImageAsync(this.GetImageStreamCallback, DefaultVisualFeatures);
                 }
             }
             catch (Exception e)

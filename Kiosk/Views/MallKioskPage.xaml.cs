@@ -15,6 +15,8 @@ using System.Collections.ObjectModel;
 using Microsoft.ProjectOxford.Common;
 using IntelligentKioskSample.MallKioskPageConfig;
 using IntelligentKioskSample.Controls;
+using System.Globalization;
+
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=234238
 
@@ -27,7 +29,7 @@ namespace IntelligentKioskSample.Views
     public sealed partial class MallKioskPage : Page
     {
         private MallKioskDemoSettings kioskSettings;
-        private Recommendation currentRecommendation;
+        private Item currentRecommendation;
         public ObservableCollection<EmotionExpressionCapture> EmotionFaces { get; set; } = new ObservableCollection<EmotionExpressionCapture>();
 
         public MallKioskPage()
@@ -66,45 +68,24 @@ namespace IntelligentKioskSample.Views
             if (this.currentRecommendation != null)
             {
                 string alternativeUrl = null;
-
-                // See if there is an alternative result based on keywords in the spoken text
-                if (this.currentRecommendation.SpeechKeywordBehavior != null)
+                if (e.TextAnalysisSentiment <= 0.33)
                 {
-                    BehaviorAction behaviorAction = this.currentRecommendation.SpeechKeywordBehavior.FirstOrDefault(behavior => e.SpeechRecognitionText.IndexOf(behavior.Key, StringComparison.OrdinalIgnoreCase) != -1);
-                    if (behaviorAction != null)
-                    {
-                        alternativeUrl = behaviorAction.Url;
-                    }
+                    // look for an override for negative sentiment
+                    // behaviorAction = this.currentRecommendation.SpeechSentimentBehavior.FirstOrDefault(behavior => string.Compare(behavior.Key, "Negative", true) == 0);
+                }
+                else if (e.TextAnalysisSentiment >= 0.66)
+                {
+
                 }
 
-                // If we didn't find an alternative based on keywords see if we have a generic one based on the sentiment of the spoken text
-                if (string.IsNullOrEmpty(alternativeUrl) && this.currentRecommendation.SpeechSentimentBehavior != null)
-                {
-                    BehaviorAction behaviorAction = null;
-                    if (e.TextAnalysisSentiment <= 0.33)
-                    {
-                        // look for an override for negative sentiment
-                        behaviorAction = this.currentRecommendation.SpeechSentimentBehavior.FirstOrDefault(behavior => string.Compare(behavior.Key, "Negative", true) == 0);
-                    }
-                    else if (e.TextAnalysisSentiment >= 0.66)
-                    {
-                        // look for an override for positive sentiment
-                        behaviorAction = this.currentRecommendation.SpeechSentimentBehavior.FirstOrDefault(behavior => string.Compare(behavior.Key, "Positive", true) == 0);
-                    }
-
-                    if (behaviorAction != null)
-                    {
-                        alternativeUrl = behaviorAction.Url;
-                    }
-                }
-
-                if (!string.IsNullOrEmpty(alternativeUrl))
-                {
-                    webView.Navigate(new Uri(alternativeUrl));
-                }
             }
-        }
+          //  if (!string.IsNullOrEmpty(alternativeUrl))
+            //{
+              //  webView.Navigate(new Uri(alternativeUrl));
+            //}
 
+        }
+   
         private async void CameraControl_ImageCaptured(object sender, ImageAnalyzer e)
         {
             this.imageFromCameraWithFaces.DataContext = e;
@@ -115,11 +96,15 @@ namespace IntelligentKioskSample.Views
             await Task.Delay(50);
 
             await this.cameraControl.StopStreamAsync();
+            //@TODO
+            //  await e.AnalyseAsync();
+
 
             e.FaceRecognitionCompleted += (s, args) =>
             {
                 ShowRecommendations(e);
             };
+
         }
 
         protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -179,41 +164,14 @@ namespace IntelligentKioskSample.Views
             base.OnNavigatingFrom(e);
         }
 
+        //@TODO change recommendation
+
         private void ShowRecommendations(ImageAnalyzer imageWithFaces)
         {
-            Recommendation recommendation = null;
-            this.currentRecommendation = null;
+            List<Item> RecommendationList = new List<Item>() { new Item("#198CB2", "http://www.swarovski.com/Web_AT/de/949740/product/Galet_Ohrringe.html", null) };
 
-            int numberOfPeople = imageWithFaces.DetectedFaces.Count();
-            if (numberOfPeople == 1)
-            {
-                // Single person
-                IdentifiedPerson identifiedPerson = imageWithFaces.IdentifiedPersons.FirstOrDefault();
-                if (identifiedPerson != null)
-                {
-                    // See if we have a personalized recommendation for this person.
-                    recommendation = this.kioskSettings.PersonalizedRecommendations.FirstOrDefault(r => r.Id.Equals(identifiedPerson.Person.Name, StringComparison.OrdinalIgnoreCase));
-                }
-
-                if (recommendation == null)
-                {
-                    // Didn't find a personalized recommendation (or we don't have anyone recognized), so default to 
-                    // the age/gender-based generic recommendation
-                    Face face = imageWithFaces.DetectedFaces.First();
-                    recommendation = this.kioskSettings.GetGenericRecommendationForPerson((int)face.FaceAttributes.Age, face.FaceAttributes.Gender);
-                }
-            }
-            else if (numberOfPeople > 1 && imageWithFaces.DetectedFaces.Any(f => f.FaceAttributes.Age <= 12) &&
-                     imageWithFaces.DetectedFaces.Any(f => f.FaceAttributes.Age > 12))
-            {
-                // Group with at least one child
-                recommendation = this.kioskSettings.GenericRecommendations.FirstOrDefault(r => r.Id == "ChildWithOneOrMoreAdults");
-            }
-            else if (numberOfPeople > 1 && !imageWithFaces.DetectedFaces.Any(f => f.FaceAttributes.Age <= 12))
-            {
-                // Group of adults without a child
-                recommendation = this.kioskSettings.GenericRecommendations.FirstOrDefault(r => r.Id == "TwoOrMoreAdults");
-            }
+            Item recommendation = RecommendationList.FirstOrDefault();
+             
 
             if (recommendation != null)
             {
@@ -222,7 +180,7 @@ namespace IntelligentKioskSample.Views
                 this.currentRecommendation = recommendation;
             }
         }
-
+    
         private void PageSizeChanged(object sender, SizeChangedEventArgs e)
         {
             this.UpdateWebCamHostGridSize();
@@ -371,4 +329,33 @@ namespace IntelligentKioskSample.Views
         public ImageSource CroppedFace { get; set; }
         public string TopEmotion { get; set; }
     }
+
+
+
+    public class Item {
+        public Item(string color, string url, List<string> keywords)
+        {
+            this.color = GetColorFromHex(color);
+            Url = url;
+            this.keywords = keywords;
+        }
+
+        public Windows.UI.Color color { get; set; }
+        public string Url { get; set; }
+        public List<String> keywords { get; set; }
+
+
+        private Windows.UI.Color GetColorFromHex(string hexString)
+        {
+            hexString = hexString.Replace("#", string.Empty);
+            byte r = byte.Parse(hexString.Substring(0, 2), NumberStyles.HexNumber);
+            byte g = byte.Parse(hexString.Substring(2, 2), NumberStyles.HexNumber);
+            byte b = byte.Parse(hexString.Substring(4, 2), NumberStyles.HexNumber);
+
+            return Windows.UI.Color.FromArgb(byte.Parse("1"), r, g, b);
+        }
+
+
+    }
+
 }
