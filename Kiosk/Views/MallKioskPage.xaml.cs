@@ -16,6 +16,8 @@ using Microsoft.ProjectOxford.Common;
 using IntelligentKioskSample.MallKioskPageConfig;
 using IntelligentKioskSample.Controls;
 using System.Globalization;
+using Windows.UI;
+using System.Diagnostics;
 
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=234238
@@ -30,8 +32,9 @@ namespace IntelligentKioskSample.Views
     {
         private MallKioskDemoSettings kioskSettings;
         private Item currentRecommendation;
+        private ImageAnalyzer currentTarget;
         public ObservableCollection<EmotionExpressionCapture> EmotionFaces { get; set; } = new ObservableCollection<EmotionExpressionCapture>();
-
+        private string basketurl = "https://www.swarovski.com/is-bin/INTERSHOP.enfinity/WFS/SCO-Web_AT-Site/de_DE/-/EUR/ViewData-Start/1232332531?JumpTarget=ViewRequisitionCheckout-ShowLoginPage&=&=&=";
         public MallKioskPage()
         {
             this.InitializeComponent();
@@ -63,27 +66,33 @@ namespace IntelligentKioskSample.Views
             this.imageFromCameraWithFaces.Visibility = Visibility.Collapsed;
         }
 
-        private void OnSpeechRecognitionAndSentimentProcessed(object sender, SpeechRecognitionAndSentimentResult e)
-        {
+        private void handleReaction(double sentiment) {
+            Item recommendation = null;
             if (this.currentRecommendation != null)
             {
-                string alternativeUrl = null;
-                if (e.TextAnalysisSentiment <= 0.33)
+                if (sentiment <= 0.33)
                 {
+                    recommendation = getRecommandation(currentTarget);
                     // look for an override for negative sentiment
                     // behaviorAction = this.currentRecommendation.SpeechSentimentBehavior.FirstOrDefault(behavior => string.Compare(behavior.Key, "Negative", true) == 0);
                 }
-                else if (e.TextAnalysisSentiment >= 0.66)
+                else if (sentiment >= 0.66)
                 {
-
+                    webView.Navigate(new Uri(basketurl));
                 }
 
             }
-          //  if (!string.IsNullOrEmpty(alternativeUrl))
-            //{
-              //  webView.Navigate(new Uri(alternativeUrl));
-            //}
+            if (recommendation != null)
+            {
+                webView.Navigate(new Uri(recommendation.Url));
+                webView.Visibility = Visibility.Visible;
+                this.currentRecommendation = recommendation;
+            }
+        }
 
+        private void OnSpeechRecognitionAndSentimentProcessed(object sender, SpeechRecognitionAndSentimentResult e)
+        {
+            handleReaction(e.TextAnalysisSentiment);
         }
    
         private async void CameraControl_ImageCaptured(object sender, ImageAnalyzer e)
@@ -96,14 +105,14 @@ namespace IntelligentKioskSample.Views
             await Task.Delay(50);
 
             await this.cameraControl.StopStreamAsync();
-            //@TODO
-            //  await e.AnalyseAsync();
+            await e.AnalyseAsync();
+            currentTarget = e;
+            ShowRecommendations(e);
 
-
-            e.FaceRecognitionCompleted += (s, args) =>
-            {
-                ShowRecommendations(e);
-            };
+            //e.FaceRecognitionCompleted += (s, args) =>
+            //{
+            //    ShowRecommendations(e);
+            //};
 
         }
 
@@ -164,15 +173,45 @@ namespace IntelligentKioskSample.Views
             base.OnNavigatingFrom(e);
         }
 
-        //@TODO change recommendation
-
-        private void ShowRecommendations(ImageAnalyzer imageWithFaces)
-        {
-            List<Item> RecommendationList = new List<Item>() { new Item("#198CB2", "http://www.swarovski.com/Web_AT/de/949740/product/Galet_Ohrringe.html", null) };
-
+        private Item getRecommandation(ImageAnalyzer image) {
+            List<Item> RecommendationList = new List<Item>() {
+                new Item("#198CB2", "http://www.swarovski.com/Web_AT/de/949740/product/Galet_Ohrringe.html", null),
+                new Item("#B01B32", "http://www.swarovski.com/Web_AT/de/5249350/product/Funk_Ohrringe.html", null),
+                 new Item("#07664A", "http://www.swarovski.com/Web_AT/de/5267105/product/Angelic_Ohrringe.html", null),
+                  new Item("#B34B16", "http://www.swarovski.com/Web_AT/de/5301077/product/Wood_Crystallized_Drop_Ohrringe,_vergoldet.html", null),
+                   new Item("#2456A7", "http://www.swarovski.com/Web_AT/de/5298756/product/Jewel-y_McHue-y_Drop_Ohrringe,_mattes_lila_Finish.html", null),
+                    new Item("#05B1A4", "http://www.swarovski.com/Web_AT/de/5298430/product/Moselle_Double-Stud_Ohrringe,_palladiniert.html", null),
+                     new Item("#FFFFFF", "http://www.swarovski.com/Web_AT/de/1121080/product/Alana_Ohrstecker.html", null),
+                      new Item("#61616A", "http://www.swarovski.com/Web_AT/de/5271718/product/Crystaldust_Kreolen,_klein,_schwarz.html", null)
+            };
+       
+            if (currentRecommendation != null) {
+                RecommendationList = RecommendationList.Where(n => n.Url != currentRecommendation.Url).ToList();
+            }
+            Color targetColor = GetColorFromHex(image.AnalysisResult.Color.AccentColor);
+            List<double> dist = new List<double>();
+            double min = 99999999;
             Item recommendation = RecommendationList.FirstOrDefault();
-             
+            foreach (Item i in RecommendationList)
+            {
 
+                double colordistance = ColourDistance(i.color, targetColor);
+                Debug.WriteLine(colordistance);
+                if (colordistance < min)
+                {
+                    min = colordistance;
+                    recommendation = i;
+                }
+
+            }
+            return recommendation;
+        }
+
+
+        //@TODO change recommendation
+        private void ShowRecommendations(ImageAnalyzer image)
+        {
+            Item recommendation = getRecommandation(image);
             if (recommendation != null)
             {
                 webView.Navigate(new Uri(recommendation.Url));
@@ -180,7 +219,43 @@ namespace IntelligentKioskSample.Views
                 this.currentRecommendation = recommendation;
             }
         }
-    
+
+        public static double ColourDistance(Color e1, Color e2)
+        {
+            long rmean = ((long)e1.R + (long)e2.R) / 2;
+            long r = (long)e1.R - (long)e2.R;
+            long g = (long)e1.G - (long)e2.G;
+            long b = (long)e1.B - (long)e2.B;
+            return Math.Sqrt((((512 + rmean) * r * r) >> 8) + 4 * g * g + (((767 - rmean) * b * b) >> 8));
+        }
+
+        // weighed distance using hue, saturation and brightness
+        // closed match in RGB space
+        int closestColor2(List<Color> colors, Color target)
+        {
+          
+            var colorDiffs = colors.Select(n => ColorDiff(n, target)).Min(n => n);
+            return colors.FindIndex(n => ColorDiff(n, target) == colorDiffs);
+        }
+
+        // color brightness as perceived:
+        float getBrightness(Windows.UI.Color c)
+        { return (c.R * 0.299f + c.G * 0.587f + c.B * 0.114f) / 256f; }
+
+        // distance between two hues:
+        float getHueDistance(float hue1, float hue2)
+        {
+            float d = Math.Abs(hue1 - hue2); return d > 180 ? 360 - d : d;
+        }
+
+        // distance in RGB space
+        int ColorDiff(Color c1, Color c2)
+        {
+            return (int)Math.Sqrt((c1.R - c2.R) * (c1.R - c2.R)
+                                   + (c1.G - c2.G) * (c1.G - c2.G)
+                                   + (c1.B - c2.B) * (c1.B - c2.B));
+        }
+
         private void PageSizeChanged(object sender, SizeChangedEventArgs e)
         {
             this.UpdateWebCamHostGridSize();
@@ -272,6 +347,8 @@ namespace IntelligentKioskSample.Views
 
                 this.sentimentControl.Sentiment = netResponse;
 
+//                handleReaction(netResponse);
+
                 // show captured faces and their emotion
                 if (this.emotionFacesGrid.Visibility == Visibility.Visible)
                 {
@@ -306,6 +383,8 @@ namespace IntelligentKioskSample.Views
                         }
                     }
                 }
+
+
             }
 
             this.isProcessingPhoto = false;
@@ -322,6 +401,15 @@ namespace IntelligentKioskSample.Views
         {
             emotionFacesGrid.Visibility = Visibility.Visible;
         }
+        public Windows.UI.Color GetColorFromHex(string hexString)
+        {
+            hexString = hexString.Replace("#", string.Empty);
+            byte r = byte.Parse(hexString.Substring(0, 2), NumberStyles.HexNumber);
+            byte g = byte.Parse(hexString.Substring(2, 2), NumberStyles.HexNumber);
+            byte b = byte.Parse(hexString.Substring(4, 2), NumberStyles.HexNumber);
+
+            return Windows.UI.Color.FromArgb(byte.Parse("1"), r, g, b);
+        }
     }
 
     public class EmotionExpressionCapture
@@ -329,8 +417,6 @@ namespace IntelligentKioskSample.Views
         public ImageSource CroppedFace { get; set; }
         public string TopEmotion { get; set; }
     }
-
-
 
     public class Item {
         public Item(string color, string url, List<string> keywords)
@@ -343,9 +429,7 @@ namespace IntelligentKioskSample.Views
         public Windows.UI.Color color { get; set; }
         public string Url { get; set; }
         public List<String> keywords { get; set; }
-
-
-        private Windows.UI.Color GetColorFromHex(string hexString)
+        public Windows.UI.Color GetColorFromHex(string hexString)
         {
             hexString = hexString.Replace("#", string.Empty);
             byte r = byte.Parse(hexString.Substring(0, 2), NumberStyles.HexNumber);
@@ -354,8 +438,5 @@ namespace IntelligentKioskSample.Views
 
             return Windows.UI.Color.FromArgb(byte.Parse("1"), r, g, b);
         }
-
-
     }
-
 }

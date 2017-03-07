@@ -111,7 +111,7 @@ namespace ServiceHelpers
                     {
                         scores[(int)data.documents[i].id] = data.documents[i].score;
                     }
-                }
+                } 
 
                 if (data.errors != null)
                 { 
