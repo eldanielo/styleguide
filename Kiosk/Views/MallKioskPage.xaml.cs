@@ -89,6 +89,30 @@ namespace IntelligentKioskSample.Views
                 this.currentRecommendation = recommendation;
             }
         }
+        private void handleReactionforEmotion(double sentiment)
+        {
+            Item recommendation = null;
+            if (this.currentRecommendation != null)
+            {
+                if (sentiment <= 0.10)
+                {
+                    recommendation = getRecommandation(currentTarget);
+                    // look for an override for negative sentiment
+                    // behaviorAction = this.currentRecommendation.SpeechSentimentBehavior.FirstOrDefault(behavior => string.Compare(behavior.Key, "Negative", true) == 0);
+                }
+                else if (sentiment >= 0.90)
+                {
+                    webView.Navigate(new Uri(basketurl));
+                }
+
+            }
+            if (recommendation != null)
+            {
+                webView.Navigate(new Uri(recommendation.Url));
+                webView.Visibility = Visibility.Visible;
+                this.currentRecommendation = recommendation;
+            }
+        }
 
         private void OnSpeechRecognitionAndSentimentProcessed(object sender, SpeechRecognitionAndSentimentResult e)
         {
@@ -347,7 +371,7 @@ namespace IntelligentKioskSample.Views
 
                 this.sentimentControl.Sentiment = netResponse;
 
-//                handleReaction(netResponse);
+              handleReaction(netResponse);
 
                 // show captured faces and their emotion
                 if (this.emotionFacesGrid.Visibility == Visibility.Visible)
