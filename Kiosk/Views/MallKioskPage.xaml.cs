@@ -66,22 +66,23 @@ namespace IntelligentKioskSample.Views
             this.imageFromCameraWithFaces.Visibility = Visibility.Collapsed;
         }
 
+        double oldsentiment = 0.5;
         private async void handleReaction(double sentiment) {
+
+                        
             Item recommendation = null;
             if (this.currentRecommendation != null)
             {
-                if (sentiment <= 0.33)
+                if (sentiment <= 0.33 && oldsentiment > 0.33)
                 {
                     recommendation = getRecommandation(currentTarget);
                     // look for an override for negative sentiment
                     // behaviorAction = this.currentRecommendation.SpeechSentimentBehavior.FirstOrDefault(behavior => string.Compare(behavior.Key, "Negative", true) == 0);
                 }
-                else if (sentiment >= 0.66)
+                else if (sentiment >= 0.66 && oldsentiment < 0.65)
                 {
                     webView.Navigate(new Uri(basketurl));
-                    
                 }
-
             }
             if (recommendation != null)
             {
@@ -412,7 +413,7 @@ namespace IntelligentKioskSample.Views
 
                 this.sentimentControl.Sentiment = netResponse;
   
-                handleReaction(netResponse);
+              //  handleReaction(netResponse);
 
                 // show captured faces and their emotion
                 if (this.emotionFacesGrid.Visibility == Visibility.Visible)

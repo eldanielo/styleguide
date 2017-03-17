@@ -119,6 +119,8 @@ namespace IntelligentKioskSample.Controls
 
         public CameraStreamState CameraStreamState { get { return captureManager != null ? captureManager.CameraStreamState : CameraStreamState.NotStreaming; } }
 
+
+        
         private MediaCapture captureManager;
         private VideoEncodingProperties videoProperties;
         private FaceTracker faceTracker;
@@ -146,6 +148,8 @@ namespace IntelligentKioskSample.Controls
                 {
                     captureManager = new MediaCapture();
 
+                    this.captureManager.Failed += CameraControl_MediaCaptureFailed;
+                    this.captureManager.RecordLimitationExceeded += CameraControl_RecordLimitationExceeded;
                     MediaCaptureInitializationSettings settings = new MediaCaptureInitializationSettings();
                     var allCameras = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture);
                     var selectedCamera = allCameras.FirstOrDefault(c => c.Name == SettingsHelper.Instance.CameraName);
@@ -187,6 +191,16 @@ namespace IntelligentKioskSample.Controls
             {
                 await Util.GenericApiCallExceptionHandler(ex, "Error starting the camera.");
             }
+        }
+
+        private void CameraControl_RecordLimitationExceeded(MediaCapture sender)
+        {
+            throw new NotImplementedException();
+        }
+
+        private void CameraControl_MediaCaptureFailed(MediaCapture sender, MediaCaptureFailedEventArgs errorEventArgs)
+        {
+            throw new NotImplementedException();
         }
 
         private async Task SetVideoEncodingToHighestResolution(bool isForRealTimeProcessing = false)
@@ -239,14 +253,18 @@ namespace IntelligentKioskSample.Controls
             try
             {
                 IEnumerable<DetectedFace> faces = null;
-
                 // Create a VideoFrame object specifying the pixel format we want our capture image to be (NV12 bitmap in this case).
                 // GetPreviewFrame will convert the native webcam frame into this format.
                 const BitmapPixelFormat InputPixelFormat = BitmapPixelFormat.Nv12;
                 using (VideoFrame previewFrame = new VideoFrame(InputPixelFormat, (int)this.videoProperties.Width, (int)this.videoProperties.Height))
                 {
-                    await this.captureManager.GetPreviewFrameAsync(previewFrame);
+                    try
+                    {
+                        await this.captureManager.GetPreviewFrameAsync(previewFrame);
+                    }
+                    catch (Exception e) {
 
+                    }
                     // The returned VideoFrame should be in the supported NV12 format but we need to verify this.
                     if (FaceDetector.IsBitmapPixelFormatSupported(previewFrame.SoftwareBitmap.BitmapPixelFormat))
                     {
