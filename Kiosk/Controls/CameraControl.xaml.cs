@@ -540,7 +540,7 @@ namespace IntelligentKioskSample.Controls
             return null;
         }
 
-        private void OnImageCaptured(ImageAnalyzer imageWithFace)
+        public void OnImageCaptured(ImageAnalyzer imageWithFace)
         {
             if (this.ImageCaptured != null)
             {

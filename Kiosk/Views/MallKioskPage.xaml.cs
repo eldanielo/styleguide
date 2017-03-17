@@ -34,7 +34,7 @@ namespace IntelligentKioskSample.Views
         private Item currentRecommendation;
         private ImageAnalyzer currentTarget;
         public ObservableCollection<EmotionExpressionCapture> EmotionFaces { get; set; } = new ObservableCollection<EmotionExpressionCapture>();
-        private string basketurl = "https://www.swarovski.com/is-bin/INTERSHOP.enfinity/WFS/SCO-Web_AT-Site/de_DE/-/EUR/ViewData-Start/1232332531?JumpTarget=ViewRequisitionCheckout-ShowLoginPage&=&=&=";
+        private string basketurl = "https://www.swarovski.com/is-bin/INTERSHOP.enfinity/WFS/SCO-Web_AT-Site/de_DE/-/EUR/ViewData-Start/1928848753?JumpTarget=ViewRequisition-View&=&=&=";
         public MallKioskPage()
         {
             this.InitializeComponent();
@@ -66,7 +66,7 @@ namespace IntelligentKioskSample.Views
             this.imageFromCameraWithFaces.Visibility = Visibility.Collapsed;
         }
 
-        private void handleReaction(double sentiment) {
+        private async void handleReaction(double sentiment) {
             Item recommendation = null;
             if (this.currentRecommendation != null)
             {
@@ -79,6 +79,7 @@ namespace IntelligentKioskSample.Views
                 else if (sentiment >= 0.66)
                 {
                     webView.Navigate(new Uri(basketurl));
+                    
                 }
 
             }
@@ -121,6 +122,8 @@ namespace IntelligentKioskSample.Views
    
         private async void CameraControl_ImageCaptured(object sender, ImageAnalyzer e)
         {
+
+            Debug.WriteLine("image captured");
             this.imageFromCameraWithFaces.DataContext = e;
             this.imageFromCameraWithFaces.Visibility = Visibility.Visible;
 
@@ -131,6 +134,9 @@ namespace IntelligentKioskSample.Views
             await this.cameraControl.StopStreamAsync();
             await e.AnalyseAsync();
             currentTarget = e;
+
+            
+
             ShowRecommendations(e);
 
             //e.FaceRecognitionCompleted += (s, args) =>
@@ -315,6 +321,38 @@ namespace IntelligentKioskSample.Views
         }
 
 
+        private IEnumerable<Tuple<Face, IdentifiedPerson>> lastIdentifiedPersonSample;
+        private IEnumerable<SimilarFaceMatch> lastSimilarPersistedFaceSample;
+        private IdentifiedPerson person;
+        private async void findIdendity(ImageAnalyzer e) { 
+            await Task.WhenAll(e.IdentifyFacesAsync(), e.FindSimilarPersistedFacesAsync());
+
+            if (!e.IdentifiedPersons.Any())
+            {
+                this.person = null;
+                this.lastIdentifiedPersonSample = null;
+                this.NameText.Text = "Hi!";
+                Debug.WriteLine("no face");
+            }
+            else
+            {
+               this.lastIdentifiedPersonSample = e.DetectedFaces.Select(f => new Tuple<Face, IdentifiedPerson>(f, e.IdentifiedPersons.FirstOrDefault(p => p.FaceId == f.FaceId)));
+                this.person = e.IdentifiedPersons.FirstOrDefault();
+
+                this.NameText.Text = "Welcome back, " + person.Person.Name;
+                Debug.WriteLine("got face");
+            }
+
+            if (!e.SimilarFaceMatches.Any())
+            {
+                this.lastSimilarPersistedFaceSample = null;
+            }
+            else
+            {
+                this.lastSimilarPersistedFaceSample = e.SimilarFaceMatches;
+            }
+            
+        }
         private async void ProcessingLoop()
         {
             while (this.isProcessingLoopInProgress)
@@ -346,9 +384,12 @@ namespace IntelligentKioskSample.Views
                 this.isProcessingPhoto = false;
                 return;
             }
-
+            await e.DetectFacesAsync(detectFaceAttributes: true);
+            // identify person 
+            findIdendity(e);
             // detect emotions
             await e.DetectEmotionAsync();
+        
 
             if (e.DetectedEmotion.Any())
             {
@@ -370,8 +411,8 @@ namespace IntelligentKioskSample.Views
                 double netResponse = ((positiveEmotionResponse - negativeEmotionResponse) * 0.5) + 0.5;
 
                 this.sentimentControl.Sentiment = netResponse;
-
-              handleReaction(netResponse);
+  
+                handleReaction(netResponse);
 
                 // show captured faces and their emotion
                 if (this.emotionFacesGrid.Visibility == Visibility.Visible)
