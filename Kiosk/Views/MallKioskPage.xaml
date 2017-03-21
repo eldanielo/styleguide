@@ -23,8 +23,20 @@
         </StackPanel>
         <TextBlock Text="Hi!" x:Name="NameText" Grid.Row="0" HorizontalAlignment="Center" Style="{StaticResource SubheaderTextBlockStyle}" ></TextBlock>
         <WebView x:Name="webView" Visibility="Collapsed" Grid.Row="1"  />
+        <Grid HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0.5" Grid.Row="2" >
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+            <Image x:Name="imageControl" Height="200" Width="200" >
 
-        <Grid HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0.5" Grid.Row="1" >
+                </Image>
+                <Border Height="200" Width="200" x:Name="detectedcolor" Grid.Column="1"></Border>
+
+        </Grid>
+        <Grid HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0.5" Grid.Row="2" >
+            <StackPanel Orientation="Vertical">
+        
             <Border BorderThickness="1" BorderBrush="White" Padding="5" Background="#FF363535">
                 <Grid x:Name="webCamHostGrid">
                     <ctl:ImageWithFaceBorderUserControl BalloonBackground="#ECCF11" BalloonForeground="#D86C2A" FlowDirection="RightToLeft" x:Name="imageFromCameraWithFaces" DetectFacesOnLoad="True" DetectFaceAttributes="True" ShowMultipleFaces="True" PerformRecognition="True" ShowRecognitionResults="True" />
@@ -70,6 +82,8 @@
                     <ctl:SpeechToTextControl Opacity="0.8" Margin="1" x:Name="speechToTextControl" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
                 </Grid>
             </Border>
+            </StackPanel>
+
         </Grid>
 
     </Grid>

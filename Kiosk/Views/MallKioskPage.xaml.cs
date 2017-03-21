@@ -18,7 +18,13 @@ using IntelligentKioskSample.Controls;
 using System.Globalization;
 using Windows.UI;
 using System.Diagnostics;
-
+using Windows.UI.Xaml.Media.Imaging;
+using System.IO;
+using System.Runtime.InteropServices.WindowsRuntime;
+using Windows.Graphics.Imaging;
+using System.Net.Http;
+using System.Text;
+using System.Net.Http.Headers;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=234238
 
@@ -127,25 +133,48 @@ namespace IntelligentKioskSample.Views
             Debug.WriteLine("image captured");
             this.imageFromCameraWithFaces.DataContext = e;
             this.imageFromCameraWithFaces.Visibility = Visibility.Visible;
-
+            
             // We induce a delay here to give the captured image some time to render before we hide the camera.
             // This avoids a black flash.
             await Task.Delay(50);
 
             await this.cameraControl.StopStreamAsync();
-            await e.AnalyseAsync();
+           await e.AnalyseAsync();
+          await  e.DetectFacesAsync(detectFaceAttributes: true, detectFaceLandmarks: true);
             currentTarget = e;
 
             
 
-            ShowRecommendations(e);
+           ShowRecommendations(e);
 
             //e.FaceRecognitionCompleted += (s, args) =>
-            //{
+            //{ 
             //    ShowRecommendations(e);
             //};
 
         }
+        
+        static async void MakeRequest(byte[] data)
+        {
+            var client = new HttpClient();
+
+            // Request headers
+            client.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", "b63705bd5e5d4117943e7175d4f68736");
+
+            var uri = "https://westus.api.cognitive.microsoft.com/vision/v1.0/analyze?" + "visualFeatures=Categories";
+
+            HttpResponseMessage response;
+
+            // Request body;
+
+            using (var content = new ByteArrayContent(data))
+            {
+                content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                response = await client.PostAsync(uri, content);
+            }
+
+        }
+ 
 
         protected override async void OnNavigatedTo(NavigationEventArgs e)
         {
@@ -212,8 +241,8 @@ namespace IntelligentKioskSample.Views
                   new Item("#B34B16", "http://www.swarovski.com/Web_AT/de/5301077/product/Wood_Crystallized_Drop_Ohrringe,_vergoldet.html", null),
                    new Item("#2456A7", "http://www.swarovski.com/Web_AT/de/5298756/product/Jewel-y_McHue-y_Drop_Ohrringe,_mattes_lila_Finish.html", null),
                     new Item("#05B1A4", "http://www.swarovski.com/Web_AT/de/5298430/product/Moselle_Double-Stud_Ohrringe,_palladiniert.html", null),
-                     new Item("#FFFFFF", "http://www.swarovski.com/Web_AT/de/1121080/product/Alana_Ohrstecker.html", null),
-                      new Item("#61616A", "http://www.swarovski.com/Web_AT/de/5271718/product/Crystaldust_Kreolen,_klein,_schwarz.html", null)
+                     new Item("#FFFFFF", "http://www.swarovski.com/Web_AT/de/1121080/product/Alana_Ohrstecker.html", null)
+                   // new Item("#61616A", "http://www.swarovski.com/Web_AT/de/5271718/product/Crystaldust_Kreolen,_klein,_schwarz.html", null)
             };
        
             if (currentRecommendation != null) {
@@ -240,9 +269,45 @@ namespace IntelligentKioskSample.Views
 
 
         //@TODO change recommendation
-        private void ShowRecommendations(ImageAnalyzer image)
+        private async void ShowRecommendations(ImageAnalyzer image)
         {
-            Item recommendation = getRecommandation(image);
+            Item recommendation = null;
+            //check for face/eye color
+            var face = image.DetectedFaces.FirstOrDefault();
+            if (face != null)
+            {
+
+                Rectangle eyerectangle = new Rectangle();
+
+
+                eyerectangle.Left = (int)face.FaceLandmarks.PupilLeft.X - 50;
+                eyerectangle.Top = (int)face.FaceLandmarks.PupilLeft.Y - 50;
+
+                eyerectangle.Width = 100;//200+ Math.Abs((int)(face.FaceLandmarks.EyeLeftInner.X - face.FaceLandmarks.EyeLeftOuter.X));
+                eyerectangle.Height = 100;//200+Math.Abs((int)(face.FaceLandmarks.EyeLeftTop.Y - face.FaceLandmarks.EyeLeftBottom.Y));
+
+                var croppedImage = await Util.GetCroppedBitmapAsync(image.GetImageStreamCallback, eyerectangle) as WriteableBitmap;
+                this.imageControl.Source = await Util.GetCroppedBitmapAsync(image.GetImageStreamCallback, eyerectangle) as WriteableBitmap;
+
+                SoftwareBitmap outputBitmap = SoftwareBitmap.CreateCopyFromBuffer(
+                    croppedImage.PixelBuffer,
+                    BitmapPixelFormat.Bgra8,
+                    croppedImage.PixelWidth,
+                    croppedImage.PixelHeight
+                );
+
+                ImageAnalyzer eyeimg = new ImageAnalyzer(await Util.GetPixelBytesFromSoftwareBitmapAsync(outputBitmap));
+                await eyeimg.AnalyseAsync();
+                
+
+
+                this.detectedcolor.Background = new SolidColorBrush( ConvertStringToColor(eyeimg.AnalysisResult.Color.AccentColor));
+                recommendation = getRecommandation(eyeimg);
+            } else {
+                this.detectedcolor.Background = new SolidColorBrush(ConvertStringToColor(image.AnalysisResult.Color.AccentColor));
+                recommendation = getRecommandation(image);
+            }
+            
             if (recommendation != null)
             {
                 webView.Navigate(new Uri(recommendation.Url));
@@ -250,6 +315,33 @@ namespace IntelligentKioskSample.Views
                 this.currentRecommendation = recommendation;
             }
         }
+        public Color ConvertStringToColor(String hex)
+        {
+
+            hex = hex.Replace("#", "");
+
+            byte a = 255;
+            byte r = 255;
+            byte g = 255;
+            byte b = 255;
+
+            int start = 0;
+
+            //handle ARGB strings (8 characters long) 
+            if (hex.Length == 8)
+            {
+                a = byte.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
+                start = 2;
+            }
+
+            //convert RGB characters to bytes 
+            r = byte.Parse(hex.Substring(start, 2), System.Globalization.NumberStyles.HexNumber);
+            g = byte.Parse(hex.Substring(start + 2, 2), System.Globalization.NumberStyles.HexNumber);
+            b = byte.Parse(hex.Substring(start + 4, 2), System.Globalization.NumberStyles.HexNumber);
+
+            return Color.FromArgb(a, r, g, b);
+        }
+
 
         public static double ColourDistance(Color e1, Color e2)
         {
@@ -505,4 +597,9 @@ namespace IntelligentKioskSample.Views
             return Windows.UI.Color.FromArgb(byte.Parse("1"), r, g, b);
         }
     }
+
+
+
 }
+
+

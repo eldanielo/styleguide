@@ -385,6 +385,8 @@ namespace ServiceHelpers
                 this.EmotionRecognitionCompleted(this, EventArgs.Empty);
             }
         }
+
+        
     }
 
 

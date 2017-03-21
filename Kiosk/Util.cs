@@ -130,6 +130,33 @@ namespace IntelligentKioskSample
             }
         }
 
+
+        async public static Task<byte[]> GetCroppedBytaArrayAsync(Func<Task<Stream>> originalImgFile, Microsoft.ProjectOxford.Common.Rectangle rectangle)
+        {
+            try
+            {
+                using (IRandomAccessStream stream = (await originalImgFile()).AsRandomAccessStream())
+                {
+                    return await GetCroppedByteArrayAsync(stream, rectangle);
+                }
+            }
+            catch
+            {
+                // default to no image if we fail to crop the bitmap
+                return null;
+            }
+        }
+
+
+
+        async public static Task<byte[]> GetCroppedByteArrayAsync(IRandomAccessStream stream, Microsoft.ProjectOxford.Common.Rectangle rectangle)
+        {
+            var pixels = await GetCroppedPixelsAsync(stream, rectangle);
+            return pixels;
+      
+        }
+
+
         async public static Task<ImageSource> GetCroppedBitmapAsync(IRandomAccessStream stream, Microsoft.ProjectOxford.Common.Rectangle rectangle)
         {
             var pixels = await GetCroppedPixelsAsync(stream, rectangle);
