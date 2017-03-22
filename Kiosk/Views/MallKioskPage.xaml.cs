@@ -63,6 +63,7 @@ namespace IntelligentKioskSample.Views
         {
             this.webView.NavigateToString("");
             this.webView.Visibility = Visibility.Collapsed;
+            this.ColorTextPanel.Visibility = Visibility.Collapsed;
 
             // We induce a delay here to give the camera some time to start rendering before we hide the last captured photo.
             // This avoids a black flash.
@@ -279,13 +280,19 @@ namespace IntelligentKioskSample.Views
 
                 Rectangle eyerectangle = new Rectangle();
 
+                eyerectangle.Left = (int)face.FaceLandmarks.EyeLeftOuter.X -25;
+                eyerectangle.Top = (int)face.FaceLandmarks.EyeLeftTop.Y -25;
 
-                eyerectangle.Left = (int)face.FaceLandmarks.PupilLeft.X - 50;
-                eyerectangle.Top = (int)face.FaceLandmarks.PupilLeft.Y - 50;
+                eyerectangle.Width = 50+Math.Abs((int)(face.FaceLandmarks.EyeLeftInner.X - face.FaceLandmarks.EyeLeftOuter.X));
+                eyerectangle.Height = 50+Math.Abs((int)(face.FaceLandmarks.EyeLeftTop.Y - face.FaceLandmarks.EyeLeftBottom.Y));
 
-                eyerectangle.Width = 100;//200+ Math.Abs((int)(face.FaceLandmarks.EyeLeftInner.X - face.FaceLandmarks.EyeLeftOuter.X));
-                eyerectangle.Height = 100;//200+Math.Abs((int)(face.FaceLandmarks.EyeLeftTop.Y - face.FaceLandmarks.EyeLeftBottom.Y));
+                /*
+                eyerectangle.Left = (int)face.FaceLandmarks.PupilLeft.X - 25;
+                eyerectangle.Top = (int)face.FaceLandmarks.PupilLeft.Y - 25;
 
+                eyerectangle.Width = 75;//200+ Math.Abs((int)(face.FaceLandmarks.EyeLeftInner.X - face.FaceLandmarks.EyeLeftOuter.X));
+                eyerectangle.Height = 75;//200+Math.Abs((int)(face.FaceLandmarks.EyeLeftTop.Y - face.FaceLandmarks.EyeLeftBottom.Y));
+                */
                 var croppedImage = await Util.GetCroppedBitmapAsync(image.GetImageStreamCallback, eyerectangle) as WriteableBitmap;
                 this.imageControl.Source = await Util.GetCroppedBitmapAsync(image.GetImageStreamCallback, eyerectangle) as WriteableBitmap;
 
@@ -300,7 +307,8 @@ namespace IntelligentKioskSample.Views
                 await eyeimg.AnalyseAsync();
                 
 
-
+                this.ColorTextBorder.Background = new SolidColorBrush(ConvertStringToColor(eyeimg.AnalysisResult.Color.AccentColor));
+                this.ColorTextPanel.Visibility = Visibility.Visible;
                 this.detectedcolor.Background = new SolidColorBrush( ConvertStringToColor(eyeimg.AnalysisResult.Color.AccentColor));
                 recommendation = getRecommandation(eyeimg);
             } else {

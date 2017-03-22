@@ -21,8 +21,17 @@
             <TextBlock Text="Swarovski Style Guide" HorizontalAlignment="Center"  Style="{StaticResource HeaderTextBlockStyle}"></TextBlock>
             <TextBlock Text="Take a photo to get a product recommendation!" HorizontalAlignment="Center" Style="{StaticResource SubheaderTextBlockStyle}" Margin="0,30,0,0" FontStyle="Italic"/>
         </StackPanel>
-        <TextBlock Text="Hi!" x:Name="NameText" Grid.Row="0" HorizontalAlignment="Center" Style="{StaticResource SubheaderTextBlockStyle}" ></TextBlock>
-        <WebView x:Name="webView" Visibility="Collapsed" Grid.Row="1"  />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+        <TextBlock Text="Hi! " x:Name="NameText" Grid.Row="0" HorizontalAlignment="Center" Style="{StaticResource SubheaderTextBlockStyle}" ></TextBlock>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" x:Name="ColorTextPanel" Visibility="Collapsed">
+
+                <TextBlock Text=" Diese Ohrringe passen gut zu ihren  "   Grid.Row="0" HorizontalAlignment="Center" Style="{StaticResource SubheaderTextBlockStyle}" ></TextBlock>
+        <Border  x:Name="ColorTextBorder" Height="25" Width="25"></Border>
+                <TextBlock Text=" Augen"  Grid.Row="0" HorizontalAlignment="Center" Style="{StaticResource SubheaderTextBlockStyle}" ></TextBlock>
+
+                </StackPanel>
+        </StackPanel>
+            <WebView x:Name="webView" Visibility="Collapsed" Grid.Row="1"  />
         <Grid HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0.5" Grid.Row="2" >
             <Grid.ColumnDefinitions>
                 <ColumnDefinition/>
