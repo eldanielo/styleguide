@@ -25,6 +25,8 @@ using Windows.Graphics.Imaging;
 using System.Net.Http;
 using System.Text;
 using System.Net.Http.Headers;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=234238
 
@@ -64,7 +66,10 @@ namespace IntelligentKioskSample.Views
             this.webView.NavigateToString("");
             this.webView.Visibility = Visibility.Collapsed;
             this.ColorTextPanel.Visibility = Visibility.Collapsed;
-
+            this.IrisText.Visibility = Visibility.Collapsed;
+            this.detectedItem.Text = "";
+            this.imageControl.Source = null;
+            this.detectedcolor.Background = new SolidColorBrush(Colors.Transparent);
             // We induce a delay here to give the camera some time to start rendering before we hide the last captured photo.
             // This avoids a black flash.
             await Task.Delay(500);
@@ -74,9 +79,10 @@ namespace IntelligentKioskSample.Views
         }
 
         double oldsentiment = 0.5;
-        private async void handleReaction(double sentiment) {
+        private async void handleReaction(double sentiment)
+        {
 
-                        
+
             Item recommendation = null;
             if (this.currentRecommendation != null)
             {
@@ -127,26 +133,26 @@ namespace IntelligentKioskSample.Views
         {
             handleReaction(e.TextAnalysisSentiment);
         }
-   
+
         private async void CameraControl_ImageCaptured(object sender, ImageAnalyzer e)
         {
 
             Debug.WriteLine("image captured");
             this.imageFromCameraWithFaces.DataContext = e;
             this.imageFromCameraWithFaces.Visibility = Visibility.Visible;
-            
+
             // We induce a delay here to give the captured image some time to render before we hide the camera.
             // This avoids a black flash.
             await Task.Delay(50);
 
             await this.cameraControl.StopStreamAsync();
-           await e.AnalyseAsync();
-          await  e.DetectFacesAsync(detectFaceAttributes: true, detectFaceLandmarks: true);
+            await e.AnalyseAsync();
+            await e.DetectFacesAsync(detectFaceAttributes: true, detectFaceLandmarks: true);
             currentTarget = e;
 
-            
 
-           ShowRecommendations(e);
+
+            ShowRecommendations(e);
 
             //e.FaceRecognitionCompleted += (s, args) =>
             //{ 
@@ -154,15 +160,15 @@ namespace IntelligentKioskSample.Views
             //};
 
         }
-        
-        static async void MakeRequest(byte[] data)
+
+        static async Task<string> MakeRequest(byte[] data)
         {
             var client = new HttpClient();
 
             // Request headers
-            client.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", "b63705bd5e5d4117943e7175d4f68736");
+            client.DefaultRequestHeaders.Add("Prediction-Key", "F20B32FD456D4060B22715664D7D54A9");
 
-            var uri = "https://westus.api.cognitive.microsoft.com/vision/v1.0/analyze?" + "visualFeatures=Categories";
+            var uri = "https://customvisionppe.azure-api.net/v1.0/Prediction/467e6e8f-7e9a-48c2-96b1-97177fcd540b/image?iterationId=7c524737-6a7a-4b23-bf65-4971bbb1c81b";
 
             HttpResponseMessage response;
 
@@ -172,10 +178,29 @@ namespace IntelligentKioskSample.Views
             {
                 content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                 response = await client.PostAsync(uri, content);
+                var jstring = await response.Content.ReadAsStringAsync();
+                RootObject obj = JsonConvert.DeserializeObject<RootObject>(jstring);
+                return obj.Classifications.First().Class;
             }
-
         }
- 
+
+
+        public class Classification
+        {
+            public string ClassId { get; set; }
+            public string Class { get; set; }
+            public double Probability { get; set; }
+        }
+
+        public class RootObject
+        {
+            public string Project { get; set; }
+            public string Iteration { get; set; }
+            public string Timestamp { get; set; }
+            public List<Classification> Classifications { get; set; }
+        }
+
+
 
         protected override async void OnNavigatedTo(NavigationEventArgs e)
         {
@@ -234,7 +259,8 @@ namespace IntelligentKioskSample.Views
             base.OnNavigatingFrom(e);
         }
 
-        private Item getRecommandation(ImageAnalyzer image) {
+        private Item getRecommandation(ImageAnalyzer image)
+        {
             List<Item> RecommendationList = new List<Item>() {
                 new Item("#198CB2", "http://www.swarovski.com/Web_AT/de/949740/product/Galet_Ohrringe.html", null),
                 new Item("#B01B32", "http://www.swarovski.com/Web_AT/de/5249350/product/Funk_Ohrringe.html", null),
@@ -245,8 +271,9 @@ namespace IntelligentKioskSample.Views
                      new Item("#FFFFFF", "http://www.swarovski.com/Web_AT/de/1121080/product/Alana_Ohrstecker.html", null)
                    // new Item("#61616A", "http://www.swarovski.com/Web_AT/de/5271718/product/Crystaldust_Kreolen,_klein,_schwarz.html", null)
             };
-       
-            if (currentRecommendation != null) {
+
+            if (currentRecommendation != null)
+            {
                 RecommendationList = RecommendationList.Where(n => n.Url != currentRecommendation.Url).ToList();
             }
             Color targetColor = GetColorFromHex(image.AnalysisResult.Color.AccentColor);
@@ -273,49 +300,83 @@ namespace IntelligentKioskSample.Views
         private async void ShowRecommendations(ImageAnalyzer image)
         {
             Item recommendation = null;
-            //check for face/eye color
-            var face = image.DetectedFaces.FirstOrDefault();
-            if (face != null)
+
+            //iris 
+            string classification = await MakeRequest(image.Data);
+
+            if (classification != "other")
             {
 
-                Rectangle eyerectangle = new Rectangle();
 
-                eyerectangle.Left = (int)face.FaceLandmarks.EyeLeftOuter.X -25;
-                eyerectangle.Top = (int)face.FaceLandmarks.EyeLeftTop.Y -25;
+                this.IrisText.Text = " Sieht aus als würden Sie " + classification + " tragen. Das könnte ihnen gefallen";
+                this.IrisText.Visibility = Visibility.Visible;
+                detectedItem.Text = classification + " detected";
 
-                eyerectangle.Width = 50+Math.Abs((int)(face.FaceLandmarks.EyeLeftInner.X - face.FaceLandmarks.EyeLeftOuter.X));
-                eyerectangle.Height = 50+Math.Abs((int)(face.FaceLandmarks.EyeLeftTop.Y - face.FaceLandmarks.EyeLeftBottom.Y));
+                if (classification == "stardust deluxe bracelet")
+                {
+                    recommendation = new Item("#198CB2", "https://www.swarovski.com/Web_US/en/5074350/product/Baron_Pierced_Earrings.html?origin=RecommendationBox", null);
+                }
+                else
+                {
+                    recommendation = new Item("#198CB2", "http://www.swarovski.com/Web_US/en/5074352/product/Baron_Bracelet.html?origin=", null);
+                }
 
-                /*
-                eyerectangle.Left = (int)face.FaceLandmarks.PupilLeft.X - 25;
-                eyerectangle.Top = (int)face.FaceLandmarks.PupilLeft.Y - 25;
-
-                eyerectangle.Width = 75;//200+ Math.Abs((int)(face.FaceLandmarks.EyeLeftInner.X - face.FaceLandmarks.EyeLeftOuter.X));
-                eyerectangle.Height = 75;//200+Math.Abs((int)(face.FaceLandmarks.EyeLeftTop.Y - face.FaceLandmarks.EyeLeftBottom.Y));
-                */
-                var croppedImage = await Util.GetCroppedBitmapAsync(image.GetImageStreamCallback, eyerectangle) as WriteableBitmap;
-                this.imageControl.Source = await Util.GetCroppedBitmapAsync(image.GetImageStreamCallback, eyerectangle) as WriteableBitmap;
-
-                SoftwareBitmap outputBitmap = SoftwareBitmap.CreateCopyFromBuffer(
-                    croppedImage.PixelBuffer,
-                    BitmapPixelFormat.Bgra8,
-                    croppedImage.PixelWidth,
-                    croppedImage.PixelHeight
-                );
-
-                ImageAnalyzer eyeimg = new ImageAnalyzer(await Util.GetPixelBytesFromSoftwareBitmapAsync(outputBitmap));
-                await eyeimg.AnalyseAsync();
-                
-
-                this.ColorTextBorder.Background = new SolidColorBrush(ConvertStringToColor(eyeimg.AnalysisResult.Color.AccentColor));
-                this.ColorTextPanel.Visibility = Visibility.Visible;
-                this.detectedcolor.Background = new SolidColorBrush( ConvertStringToColor(eyeimg.AnalysisResult.Color.AccentColor));
-                recommendation = getRecommandation(eyeimg);
-            } else {
-                this.detectedcolor.Background = new SolidColorBrush(ConvertStringToColor(image.AnalysisResult.Color.AccentColor));
-                recommendation = getRecommandation(image);
             }
-            
+            else
+            {
+                detectedItem.Text = "No swarovski product detected";
+                //check for face/eye color
+                var face = image.DetectedFaces.FirstOrDefault();
+                if (face != null)
+                {
+
+                    Rectangle eyerectangle = new Rectangle();
+
+                    eyerectangle.Left = (int)face.FaceLandmarks.EyeLeftOuter.X - 25;
+                    eyerectangle.Top = (int)face.FaceLandmarks.EyeLeftTop.Y - 25;
+
+                    eyerectangle.Width = 50 + Math.Abs((int)(face.FaceLandmarks.EyeLeftInner.X - face.FaceLandmarks.EyeLeftOuter.X));
+                    eyerectangle.Height = 50 + Math.Abs((int)(face.FaceLandmarks.EyeLeftTop.Y - face.FaceLandmarks.EyeLeftBottom.Y));
+
+                    /*
+                    eyerectangle.Left = (int)face.FaceLandmarks.PupilLeft.X - 25;
+                    eyerectangle.Top = (int)face.FaceLandmarks.PupilLeft.Y - 25;
+
+                    eyerectangle.Width = 75;//200+ Math.Abs((int)(face.FaceLandmarks.EyeLeftInner.X - face.FaceLandmarks.EyeLeftOuter.X));
+                    eyerectangle.Height = 75;//200+Math.Abs((int)(face.FaceLandmarks.EyeLeftTop.Y - face.FaceLandmarks.EyeLeftBottom.Y));
+                    */
+                    var croppedImage = await Util.GetCroppedBitmapAsync(image.GetImageStreamCallback, eyerectangle) as WriteableBitmap;
+                    this.imageControl.Source = await Util.GetCroppedBitmapAsync(image.GetImageStreamCallback, eyerectangle) as WriteableBitmap;
+
+                    SoftwareBitmap outputBitmap = SoftwareBitmap.CreateCopyFromBuffer(
+                        croppedImage.PixelBuffer,
+                        BitmapPixelFormat.Bgra8,
+                        croppedImage.PixelWidth,
+                        croppedImage.PixelHeight
+                    );
+
+                    ImageAnalyzer eyeimg = new ImageAnalyzer(await Util.GetPixelBytesFromSoftwareBitmapAsync(outputBitmap));
+                    await eyeimg.AnalyseAsync();
+
+
+                    this.ColorTextBorder.Background = new SolidColorBrush(ConvertStringToColor(eyeimg.AnalysisResult.Color.AccentColor));
+                    this.ColorTextPanel.Visibility = Visibility.Visible;
+                    this.detectedcolor.Background = new SolidColorBrush(ConvertStringToColor(eyeimg.AnalysisResult.Color.AccentColor));
+                    recommendation = getRecommandation(eyeimg);
+                }
+                // general color matching
+                else
+                {
+
+
+
+                    this.detectedcolor.Background = new SolidColorBrush(ConvertStringToColor(image.AnalysisResult.Color.AccentColor));
+                    recommendation = getRecommandation(image);
+
+
+                }
+            }
+
             if (recommendation != null)
             {
                 webView.Navigate(new Uri(recommendation.Url));
@@ -364,7 +425,7 @@ namespace IntelligentKioskSample.Views
         // closed match in RGB space
         int closestColor2(List<Color> colors, Color target)
         {
-          
+
             var colorDiffs = colors.Select(n => ColorDiff(n, target)).Min(n => n);
             return colors.FindIndex(n => ColorDiff(n, target) == colorDiffs);
         }
@@ -425,7 +486,8 @@ namespace IntelligentKioskSample.Views
         private IEnumerable<Tuple<Face, IdentifiedPerson>> lastIdentifiedPersonSample;
         private IEnumerable<SimilarFaceMatch> lastSimilarPersistedFaceSample;
         private IdentifiedPerson person;
-        private async void findIdendity(ImageAnalyzer e) { 
+        private async void findIdendity(ImageAnalyzer e)
+        {
             await Task.WhenAll(e.IdentifyFacesAsync(), e.FindSimilarPersistedFacesAsync());
 
             if (!e.IdentifiedPersons.Any())
@@ -437,7 +499,7 @@ namespace IntelligentKioskSample.Views
             }
             else
             {
-               this.lastIdentifiedPersonSample = e.DetectedFaces.Select(f => new Tuple<Face, IdentifiedPerson>(f, e.IdentifiedPersons.FirstOrDefault(p => p.FaceId == f.FaceId)));
+                this.lastIdentifiedPersonSample = e.DetectedFaces.Select(f => new Tuple<Face, IdentifiedPerson>(f, e.IdentifiedPersons.FirstOrDefault(p => p.FaceId == f.FaceId)));
                 this.person = e.IdentifiedPersons.FirstOrDefault();
 
                 this.NameText.Text = "Welcome back, " + person.Person.Name;
@@ -452,7 +514,7 @@ namespace IntelligentKioskSample.Views
             {
                 this.lastSimilarPersistedFaceSample = e.SimilarFaceMatches;
             }
-            
+
         }
         private async void ProcessingLoop()
         {
@@ -490,7 +552,7 @@ namespace IntelligentKioskSample.Views
             findIdendity(e);
             // detect emotions
             await e.DetectEmotionAsync();
-        
+
 
             if (e.DetectedEmotion.Any())
             {
@@ -512,8 +574,8 @@ namespace IntelligentKioskSample.Views
                 double netResponse = ((positiveEmotionResponse - negativeEmotionResponse) * 0.5) + 0.5;
 
                 this.sentimentControl.Sentiment = netResponse;
-  
-              //  handleReaction(netResponse);
+
+                //  handleReaction(netResponse);
 
                 // show captured faces and their emotion
                 if (this.emotionFacesGrid.Visibility == Visibility.Visible)
@@ -584,7 +646,8 @@ namespace IntelligentKioskSample.Views
         public string TopEmotion { get; set; }
     }
 
-    public class Item {
+    public class Item
+    {
         public Item(string color, string url, List<string> keywords)
         {
             this.color = GetColorFromHex(color);

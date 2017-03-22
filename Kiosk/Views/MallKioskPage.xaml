@@ -30,17 +30,23 @@
                 <TextBlock Text=" Augen"  Grid.Row="0" HorizontalAlignment="Center" Style="{StaticResource SubheaderTextBlockStyle}" ></TextBlock>
 
                 </StackPanel>
+            <TextBlock Text="" x:Name="IrisText"   Grid.Row="0" HorizontalAlignment="Center" Style="{StaticResource SubheaderTextBlockStyle}" ></TextBlock>
+
         </StackPanel>
             <WebView x:Name="webView" Visibility="Collapsed" Grid.Row="1"  />
         <Grid HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0.5" Grid.Row="2" >
             <Grid.ColumnDefinitions>
                 <ColumnDefinition/>
                 <ColumnDefinition/>
+                <ColumnDefinition/>
+
             </Grid.ColumnDefinitions>
             <Image x:Name="imageControl" Height="200" Width="200" >
 
                 </Image>
                 <Border Height="200" Width="200" x:Name="detectedcolor" Grid.Column="1"></Border>
+            <TextBlock x:Name="detectedItem" Grid.Column="2"></TextBlock>
+
 
         </Grid>
         <Grid HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0.5" Grid.Row="2" >
